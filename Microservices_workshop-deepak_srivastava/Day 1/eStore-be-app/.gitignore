@@ -1,0 +1,47 @@
+# Maven
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+out/
+
+# Eclipse
+.project
+.classpath
+.csettings
+.settings/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+*.log.*.gz
+
+# Build
+/build/
+
+# Dependency directories
+/node_modules/
+
+# Test reports
+/surefire-reports/
+
+# Redis dump
+*.rdb
+
+# Misc
+*.swp
+*.swo
+
+# Application properties (optional, if you want to keep secrets out)
+# src/main/resources/application-*.yml
+# src/main/resources/application-*.properties 

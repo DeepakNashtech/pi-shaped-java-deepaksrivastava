@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option java_package = "com.evolve.grpc";
+option java_outer_classname = "ChatProto";
+
+service ChatService {
+  // Bi-directional streaming RPC
+  rpc chat(stream ChatMessage) returns (stream ChatMessage);
+}
+
+// Message format
+message ChatMessage {
+  string user = 1;
+  string text = 2;
+  int64 timestamp = 3;
+}

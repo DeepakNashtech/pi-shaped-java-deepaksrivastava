@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cart Events SSE Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .events-panel {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .controls-panel {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .event {
+            background-color: #f5f5f5;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+            border-left: 4px solid #007bff;
+        }
+        .event.error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .event.add-item {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+        .event.remove-item {
+            border-left-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        .event.update-cart {
+            border-left-color: #17a2b8;
+            background-color: #d1ecf1;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cart Events SSE Test</h1>
+    
+    <div class="container">
+        <div class="events-panel">
+            <h3>Real-time Cart Events</h3>
+            <div id="status" class="status disconnected">Disconnected</div>
+            <button id="connectBtn" onclick="connectSSE()">Connect to SSE</button>
+            <button id="disconnectBtn" onclick="disconnectSSE()" disabled>Disconnect</button>
+            <button onclick="clearEvents()">Clear Events</button>
+            <div id="events"></div>
+        </div>
+        
+        <div class="controls-panel">
+            <h3>Trigger Cart Events</h3>
+            <div>
+                <label for="userId">User ID:</label>
+                <input type="number" id="userId" value="1" min="1">
+            </div>
+            <div>
+                <label for="productId">Product ID:</label>
+                <input type="number" id="productId" value="101" min="1">
+            </div>
+            <div>
+                <label for="quantity">Quantity:</label>
+                <input type="number" id="quantity" value="1" min="1">
+            </div>
+            <div>
+                <label for="cartStatus">Cart Status:</label>
+                <select id="cartStatus">
+                    <option value="active">Active</option>
+                    <option value="pending">Pending</option>
+                    <option value="checked_out">Checked Out</option>
+                    <option value="abandoned">Abandoned</option>
+                </select>
+            </div>
+            <button onclick="createCart()">Create Cart</button>
+            <button onclick="addItem()">Add Item</button>
+            <button onclick="updateCart()">Update Cart</button>
+            <button onclick="removeItem()">Remove Item</button>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let cartId = null;
+
+        function connectSSE() {
+            const userId = document.getElementById('userId').value;
+            const url = userId ? `/cart-events/${userId}` : '/cart-events';
+            
+            eventSource = new EventSource(url);
+            
+            eventSource.onopen = function(event) {
+                updateStatus('Connected', 'connected');
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+            };
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const cartEvent = JSON.parse(event.data);
+                    addEvent(cartEvent);
+                } catch (error) {
+                    addErrorEvent('Error parsing event: ' + error.message);
+                }
+            };
+            
+            eventSource.onerror = function(event) {
+                updateStatus('Connection Error', 'disconnected');
+                addErrorEvent('SSE connection error');
+            };
+        }
+
+        function disconnectSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                updateStatus('Disconnected', 'disconnected');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            }
+        }
+
+        function updateStatus(message, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + className;
+        }
+
+        function addEvent(cartEvent) {
+            const eventsDiv = document.getElementById('events');
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event ' + getEventClass(cartEvent.eventType);
+            
+            const timestamp = new Date(cartEvent.timestamp).toLocaleTimeString();
+            eventDiv.innerHTML = `
+                <strong>${cartEvent.eventType}</strong> - ${timestamp}<br>
+                <small>Cart ID: ${cartEvent.cartId}, User ID: ${cartEvent.userId}</small><br>
+                ${cartEvent.message}
+            `;
+            
+            eventsDiv.insertBefore(eventDiv, eventsDiv.firstChild);
+        }
+
+        function addErrorEvent(message) {
+            const eventsDiv = document.getElementById('events');
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event error';
+            eventDiv.textContent = message;
+            eventsDiv.insertBefore(eventDiv, eventsDiv.firstChild);
+        }
+
+        function getEventClass(eventType) {
+            switch (eventType) {
+                case 'ADD_ITEM': return 'add-item';
+                case 'REMOVE_ITEM': return 'remove-item';
+                case 'UPDATE_CART': return 'update-cart';
+                default: return '';
+            }
+        }
+
+        function clearEvents() {
+            document.getElementById('events').innerHTML = '';
+        }
+
+        async function createCart() {
+            const userId = document.getElementById('userId').value;
+            try {
+                const response = await fetch(`/carts/user/${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        status: 'active'
+                    })
+                });
+                
+                if (response.ok) {
+                    const cart = await response.json();
+                    cartId = cart.id;
+                    addEvent({
+                        eventType: 'CART_CREATED',
+                        cartId: cart.id,
+                        userId: cart.userId,
+                        message: 'Cart created successfully'
+                    });
+                }
+            } catch (error) {
+                addErrorEvent('Error creating cart: ' + error.message);
+            }
+        }
+
+        async function addItem() {
+            if (!cartId) {
+                addErrorEvent('Please create a cart first');
+                return;
+            }
+            
+            const productId = document.getElementById('productId').value;
+            const quantity = document.getElementById('quantity').value;
+            
+            try {
+                const response = await fetch(`/carts/${cartId}/items`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        productId: parseInt(productId),
+                        quantity: parseInt(quantity)
+                    })
+                });
+                
+                if (!response.ok) {
+                    addErrorEvent('Error adding item: ' + response.statusText);
+                }
+            } catch (error) {
+                addErrorEvent('Error adding item: ' + error.message);
+            }
+        }
+
+        async function updateCart() {
+            if (!cartId) {
+                addErrorEvent('Please create a cart first');
+                return;
+            }
+            
+            const status = document.getElementById('cartStatus').value;
+            
+            try {
+                const response = await fetch(`/carts/${cartId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id: cartId,
+                        status: status
+                    })
+                });
+                
+                if (!response.ok) {
+                    addErrorEvent('Error updating cart: ' + response.statusText);
+                }
+            } catch (error) {
+                addErrorEvent('Error updating cart: ' + error.message);
+            }
+        }
+
+        async function removeItem() {
+            // This would require knowing the item ID, so we'll just show an error
+            addErrorEvent('Remove item requires item ID - use API directly');
+        }
+    </script>
+</body>
+</html> 
